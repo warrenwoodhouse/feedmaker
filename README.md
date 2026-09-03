@@ -3,6 +3,8 @@
 # feedmaker
 Create your own feeds using FeedMaker, my robust browser based RSS Feed creation tool, which also lets you easily generate posts from websites and web links that don’t have a native feed url.
 
+[CLICK HERE](https://warrenwoodhouse.github.io/feedmaker/editor) to start using the editor.
+
 I would greatly appreciate it if you could support me by subscribing to my YouTube channel by [CLICKING HERE](https://youtube.com/user/warrenwoodhouse).
 
 # issues
