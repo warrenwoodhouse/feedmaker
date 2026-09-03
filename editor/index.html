@@ -1,0 +1,247 @@
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FeedMaker - Warren Woodhouse</title>
+    <style>
+        :root {
+            --primary: #f26522; /* RSS Orange */
+            --bg: #f9f9f9;
+            --border: #ccc;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2 { color: var(--primary); }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin-top: 15px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button:hover { background-color: #d35400; }
+        .item-list {
+            list-style: none;
+            padding: 0;
+        }
+        .item-list li {
+            background: #eee;
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+        #xmlOutput {
+            height: 300px;
+            font-family: monospace;
+            background: #2d2d2d;
+            color: #ccc;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>FeedMaker - Warren Woodhouse</h1>
+    <p>Create a valid RSS 2.0 feed for sites that don't have one.</p>
+
+    <div class="grid">
+        <div>
+            <div class="card">
+                <h2>1. Feed Details (Channel)</h2>
+                <label>Feed Title</label>
+                <input type="text" id="feedTitle" placeholder="e.g., My Awesome Blog" value="My Website Feed">
+                
+                <label>Website URL</label>
+                <input type="url" id="feedUrl" placeholder="https://example.com" value="https://example.com">
+                
+                <label>Feed Description</label>
+                <textarea id="feedDesc" rows="3" placeholder="What is this feed about?">Latest updates from my website.</textarea>
+            </div>
+
+            <div class="card">
+                <h2>2. Add a Post (Item)</h2>
+                <label>Post Title</label>
+                <input type="text" id="itemTitle" placeholder="e.g., New Feature Released">
+                
+                <label>Post URL</label>
+                <input type="url" id="itemUrl" placeholder="https://example.com/post-1">
+                
+                <label>Publication Date</label>
+                <input type="datetime-local" id="itemDate">
+                
+                <label>Post Summary / Description</label>
+                <textarea id="itemDesc" rows="3" placeholder="Brief summary of the post..."></textarea>
+                
+                <button onclick="addItem()">+ Add Post to Feed</button>
+            </div>
+        </div>
+
+        <div>
+            <div class="card">
+                <h2>3. Current Posts</h2>
+                <ul class="item-list" id="itemList">
+                    </ul>
+            </div>
+
+            <div class="card">
+                <h2>4. Generated RSS XML</h2>
+                <button onclick="generateRSS()" style="margin-top:0; margin-bottom: 15px; width: 100%;">Generate / Update XML</button>
+                <textarea id="xmlOutput" readonly placeholder="Your RSS XML will appear here..."></textarea>
+                <button onclick="downloadRSS()" style="background: #27ae60;">Download .xml File</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Array to store our feed items
+        let feedItems = [];
+
+        // Function to add an item to the array and update the UI
+        function addItem() {
+            const title = document.getElementById('itemTitle').value;
+            const url = document.getElementById('itemUrl').value;
+            const dateInput = document.getElementById('itemDate').value;
+            const desc = document.getElementById('itemDesc').value;
+
+            if (!title || !url) {
+                alert("Please provide at least a title and a URL for the post.");
+                return;
+            }
+
+            // Convert local datetime to standard RFC 822 date for RSS
+            let pubDate = new Date().toUTCString(); 
+            if (dateInput) {
+                pubDate = new Date(dateInput).toUTCString();
+            }
+
+            const item = { title, url, desc, pubDate };
+            feedItems.push(item);
+            
+            // Clear item form
+            document.getElementById('itemTitle').value = '';
+            document.getElementById('itemUrl').value = '';
+            document.getElementById('itemDate').value = '';
+            document.getElementById('itemDesc').value = '';
+
+            renderItemList();
+            generateRSS(); // Auto-update XML
+        }
+
+        // Function to remove an item
+        function removeItem(index) {
+            feedItems.splice(index, 1);
+            renderItemList();
+            generateRSS();
+        }
+
+        // Render the list of items in the UI
+        function renderItemList() {
+            const list = document.getElementById('itemList');
+            list.innerHTML = '';
+            feedItems.forEach((item, index) => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <span><strong>${item.title}</strong><br><small>${item.pubDate}</small></span>
+                    <button style="margin:0; padding:5px 10px; background:#e74c3c;" onclick="removeItem(${index})">X</button>
+                `;
+                list.appendChild(li);
+            });
+        }
+
+        // Function to generate the XML string
+        function generateRSS() {
+            const feedTitle = escapeXml(document.getElementById('feedTitle').value);
+            const feedUrl = escapeXml(document.getElementById('feedUrl').value);
+            const feedDesc = escapeXml(document.getElementById('feedDesc').value);
+
+            let xml = `<?xml version="1.0" encoding="UTF-8" ?>\n`;
+            xml += `<rss version="2.0">\n`;
+            xml += `  <channel>\n`;
+            xml += `    <title>${feedTitle}</title>\n`;
+            xml += `    <link>${feedUrl}</link>\n`;
+            xml += `    <description>${feedDesc}</description>\n`;
+
+            feedItems.forEach(item => {
+                xml += `    <item>\n`;
+                xml += `      <title>${escapeXml(item.title)}</title>\n`;
+                xml += `      <link>${escapeXml(item.url)}</link>\n`;
+                xml += `      <description>${escapeXml(item.desc)}</description>\n`;
+                xml += `      <pubDate>${item.pubDate}</pubDate>\n`;
+                xml += `      <guid>${escapeXml(item.url)}</guid>\n`;
+                xml += `    </item>\n`;
+            });
+
+            xml += `  </channel>\n`;
+            xml += `</rss>`;
+
+            document.getElementById('xmlOutput').value = xml;
+        }
+
+        // Utility to escape XML special characters
+        function escapeXml(unsafe) {
+            return unsafe.replace(/[<>&'"]/g, function (c) {
+                switch (c) {
+                    case '<': return '&lt;';
+                    case '>': return '&gt;';
+                    case '&': return '&amp;';
+                    case '\'': return '&apos;';
+                    case '"': return '&quot;';
+                }
+            });
+        }
+
+        // Function to trigger a download of the XML file
+        function downloadRSS() {
+            const xmlText = document.getElementById('xmlOutput').value;
+            if(!xmlText) {
+                alert("Generate the RSS first!");
+                return;
+            }
+            const blob = new Blob([xmlText], { type: "application/rss+xml" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "feed.xml";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
